@@ -24,9 +24,9 @@ build/
 *.log
 
 # SQLite databases
-*.db
+#*.db
 *.sqlite3
 
 Presentation files
-*.pptx
 *.txt
+*.pptx
