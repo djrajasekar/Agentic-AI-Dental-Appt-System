@@ -29,4 +29,4 @@ build/
 
 Presentation files
 *.txt
-*.pptx
+# *.pptx
