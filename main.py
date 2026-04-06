@@ -4,16 +4,21 @@ CLI entry point for local dental agent testing.
 ****************************************
 """
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    def load_dotenv(*_args, **_kwargs):
+        return False
 
 # ****************************************
 # Environment bootstrap keeps local runs simple.
 # ****************************************
 # Loads local environment values so the CLI works without extra shell setup.
-load_dotenv()
+load_dotenv(override=True)
 
 from langchain_core.messages import HumanMessage, AIMessageChunk
-from dental_agent.agent import dental_graph
+
+_DENTAL_GRAPH = None
 
 # ****************************************
 # Terminal banner shows sample prompts for demos.
@@ -64,6 +69,18 @@ def _content_to_text(content) -> str:
 # ****************************************
 # Shared message processing powers both CLI and UI.
 # ****************************************
+def _get_dental_graph():
+    """Build the shared agent graph only when a chat turn actually needs it."""
+    global _DENTAL_GRAPH
+
+    if _DENTAL_GRAPH is None:
+        from dental_agent.agent import dental_graph
+
+        _DENTAL_GRAPH = dental_graph
+
+    return _DENTAL_GRAPH
+
+
 def process_user_message(history, user_input: str):
     """Run one user turn through the shared graph so the CLI and Streamlit UI behave the same way."""
     working_history = list(history)
@@ -73,7 +90,7 @@ def process_user_message(history, user_input: str):
     response_chunks = []
 
     # Stream both partial text and the final state so the next turn keeps full context.
-    for event_type, data in dental_graph.stream(
+    for event_type, data in _get_dental_graph().stream(
         {"messages": working_history},
         stream_mode=["messages", "values"],
         config={"recursion_limit": 20},

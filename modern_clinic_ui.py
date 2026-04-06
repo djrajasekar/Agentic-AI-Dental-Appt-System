@@ -191,7 +191,7 @@ def render_chat_area(placeholder: str, spinner_text: str = "Thinking with Gemini
         avatar = "🤖" if msg["role"] == "assistant" else "🙂"
         with st.chat_message(msg["role"], avatar=avatar):
             if msg["role"] == "assistant":
-                st.info(msg["content"], icon="✨")
+                st.markdown(msg["content"])
             else:
                 st.markdown(msg["content"])
 
@@ -210,7 +210,7 @@ def render_chat_area(placeholder: str, spinner_text: str = "Thinking with Gemini
                 try:
                     reply, updated_history = process_user_message(st.session_state.agent_history, prompt)
                     st.session_state.agent_history = updated_history
-                    st.info(reply, icon="✨")
+                    st.markdown(reply)
                 except Exception as exc:
                     reply = f"⚠️ Error: {exc}"
                     st.error(reply)
@@ -233,20 +233,20 @@ init_ui_state()
 MODERN_CSS = """
 <style>
     .stApp {
-        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 45%, #0f766e 100%);
-        color: #e2e8f0;
+        background: linear-gradient(145deg, #f4f7fb 0%, #ddeaf4 42%, #c7e3dc 100%);
+        color: #10233a;
     }
     .panel {
         border-radius: 18px;
         padding: 1rem 1.2rem;
-        background: rgba(255, 255, 255, 0.10);
-        border: 1px solid rgba(255, 255, 255, 0.18);
-        box-shadow: 0 8px 30px rgba(15, 23, 42, 0.24);
+        background: rgba(255, 255, 255, 0.78);
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.10);
         backdrop-filter: blur(10px);
         margin-bottom: 1rem;
     }
-    .panel h1, .panel h3 {
-        color: #ffffff;
+    .panel h1, .panel h3, .panel p, .panel li {
+        color: #10233a;
         margin-top: 0;
     }
     .agent-chip {
@@ -254,12 +254,49 @@ MODERN_CSS = """
         margin: 0.2rem 0.35rem 0.2rem 0;
         padding: 0.35rem 0.7rem;
         border-radius: 999px;
-        background: rgba(255,255,255,0.14);
+        background: #103b66;
         color: #f8fafc;
         font-size: 0.9rem;
     }
+    div[data-testid="stSidebar"] {
+        background: rgba(16, 35, 58, 0.94);
+    }
+    div[data-testid="stSidebar"] * {
+        color: #e6eef8;
+    }
+    div[data-testid="stMetric"] {
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        border-radius: 16px;
+        padding: 0.8rem 1rem;
+    }
     div[data-testid="stAlert"] {
         border-radius: 14px;
+        background: rgba(255, 255, 255, 0.94);
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        color: #10233a;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+    }
+    div[data-testid="stAlert"] * {
+        color: #10233a !important;
+    }
+    div[data-testid="stChatMessage"] {
+        background: rgba(255, 255, 255, 0.55);
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        border-radius: 18px;
+        padding: 0.25rem 0.5rem;
+        margin-bottom: 0.6rem;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    }
+    div[data-testid="stChatMessage"] p,
+    div[data-testid="stChatMessage"] li,
+    div[data-testid="stChatMessage"] span,
+    div[data-testid="stChatMessage"] label {
+        color: #10233a;
+    }
+    div[data-testid="stChatInput"] textarea {
+        background: rgba(255, 255, 255, 0.96);
+        color: #10233a;
     }
 </style>
 """

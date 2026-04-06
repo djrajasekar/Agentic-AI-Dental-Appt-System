@@ -6,12 +6,40 @@ Shared runtime settings for the dental app.
 
 import os
 from pathlib import Path
-from dotenv import load_dotenv
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    def load_dotenv(*_args, **_kwargs):
+        return False
+
+try:
+    import truststore
+except ImportError:
+    truststore = None
 
 # ****************************************
 # Load shared environment values once for the app.
 # ****************************************
-load_dotenv()
+load_dotenv(override=True)
+
+
+# ****************************************
+# SSL bootstrap prefers the Windows trust store for outbound HTTPS.
+# ****************************************
+def configure_ssl() -> None:
+    """Use the OS certificate store when truststore is available."""
+    if truststore is None:
+        return
+
+    try:
+        truststore.inject_into_ssl()
+    except Exception:
+        # Fall back to Python's default SSL behavior if truststore injection fails.
+        return
+
+
+configure_ssl()
 
 # ****************************************
 # Path settings keep file access consistent across entrypoints.
