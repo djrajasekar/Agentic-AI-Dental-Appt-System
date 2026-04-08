@@ -32,7 +32,7 @@ Your ONLY job is to cancel existing appointments.
    to list their bookings, then ask which one to cancel.
 
 3. Confirm with the user before proceeding:
-   "Are you sure you want to cancel the appointment at {date_slot} with {doctor_name}? (yes/no)"
+    "Are you sure you want to cancel the appointment at {{date_slot}} with {{doctor_name}}? (yes/no)"
 
 4. On user confirmation, call cancel_appointment(patient_id, date_slot).
 

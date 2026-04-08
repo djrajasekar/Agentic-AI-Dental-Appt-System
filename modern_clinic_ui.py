@@ -4,6 +4,7 @@ Modern Clinic Streamlit experience.
 ****************************************
 """
 
+from html import escape
 import sqlite3
 from datetime import date
 
@@ -44,6 +45,8 @@ def init_ui_state() -> None:
         st.session_state.ui_messages = [{"role": "assistant", "content": WELCOME_MESSAGE}]
     if "pending_prompt" not in st.session_state:
         st.session_state.pending_prompt = None
+    if "trace_events" not in st.session_state:
+        st.session_state.trace_events = []
 
 
 def queue_prompt(prompt_text: str) -> None:
@@ -56,6 +59,7 @@ def clear_chat() -> None:
     st.session_state.agent_history = []
     st.session_state.ui_messages = [{"role": "assistant", "content": WELCOME_MESSAGE}]
     st.session_state.pending_prompt = None
+    st.session_state.trace_events = []
 
 
 def query_availability_records(
@@ -102,6 +106,7 @@ def query_availability_records(
             date_slot,
             specialization,
             doctor_name,
+            COALESCE(patient_to_attend, '') AS patient_id,
             CASE WHEN is_available = 1 THEN 'Available' ELSE 'Booked' END AS availability
         FROM doctor_availability
         {where_clause}
@@ -119,7 +124,7 @@ def query_availability_records(
 @st.dialog("🔎 Search doctor availability")
 def show_availability_search_dialog() -> None:
     """Give reception staff a quick live lookup window without leaving the main dashboard."""
-    st.caption("Search `doctor_availability.db` by date, specialization, doctor, or status.")
+    st.caption("Search `doctor_availability.db` by date, specialization, doctor, status, and assigned patient ID.")
 
     date_value = st.date_input(
         "Date filter",
@@ -153,7 +158,16 @@ def show_availability_search_dialog() -> None:
         return
 
     st.write(f"**Matches:** {len(results)}")
-    st.dataframe(results, use_container_width=True, hide_index=True)
+    display_results = results.rename(
+        columns={
+            "date_slot": "Date/Time",
+            "specialization": "Specialization",
+            "doctor_name": "Doctor",
+            "patient_id": "Patient ID",
+            "availability": "Status",
+        }
+    )
+    st.table(display_results)
 
 
 def render_availability_lookup_button() -> None:
@@ -182,10 +196,44 @@ def render_sidebar(title: str) -> None:
                 args=(prompt_text,),
             )
 
+        st.caption("The right-side panel shows the full workflow trace for each request.")
+
         st.button("🧹 Clear chat", use_container_width=True, on_click=clear_chat)
 
 
-def render_chat_area(placeholder: str, spinner_text: str = "Thinking with Gemini...") -> None:
+def _build_trace_markup() -> str:
+    """Render the live backend trace as HTML so a placeholder can refresh it during streaming."""
+    mode_title = "Full Workflow Trace"
+    mode_description = "Supervisor, specialist agent, tool calls, and final response flow."
+
+    if not st.session_state.trace_events:
+        entries_html = '<div class="trace-empty">Run a prompt to see the backend steps appear here.</div>'
+    else:
+        entries_html = "".join(
+            (
+                f'<div class="trace-entry">'
+                f'<span class="trace-index">{index:02d}</span>'
+                f'<span class="trace-text">{escape(entry)}</span>'
+                f"</div>"
+            )
+            for index, entry in enumerate(st.session_state.trace_events, start=1)
+        )
+
+    return f"""
+        <div class="panel trace-panel">
+            <h3>🧭 {mode_title}</h3>
+            <p>{mode_description}</p>
+            <div class="trace-log">{entries_html}</div>
+        </div>
+    """
+
+
+def render_trace_panel(trace_placeholder) -> None:
+    """Refresh the side-panel trace without rerendering the rest of the page."""
+    trace_placeholder.markdown(_build_trace_markup(), unsafe_allow_html=True)
+
+
+def render_chat_area(trace_placeholder, placeholder: str, spinner_text: str = "Thinking with Gemini...") -> None:
     """Replay the visible transcript, then send each new prompt through the shared agent flow."""
     for msg in st.session_state.ui_messages:
         avatar = "🤖" if msg["role"] == "assistant" else "🙂"
@@ -201,28 +249,39 @@ def render_chat_area(placeholder: str, spinner_text: str = "Thinking with Gemini
         st.session_state.pending_prompt = None
 
     if prompt:
+        st.session_state.trace_events = []
+        render_trace_panel(trace_placeholder)
         st.session_state.ui_messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user", avatar="🙂"):
-            st.markdown(prompt)
 
-        with st.chat_message("assistant", avatar="🤖"):
-            with st.spinner(spinner_text):
-                try:
-                    reply, updated_history = process_user_message(st.session_state.agent_history, prompt)
-                    st.session_state.agent_history = updated_history
-                    st.markdown(reply)
-                except Exception as exc:
-                    reply = f"⚠️ Error: {exc}"
-                    st.error(reply)
+        def update_trace(event_text: str) -> None:
+            st.session_state.trace_events.append(event_text)
+            render_trace_panel(trace_placeholder)
+
+        with st.spinner(spinner_text):
+            try:
+                reply, updated_history, trace_events = process_user_message(
+                    st.session_state.agent_history,
+                    prompt,
+                    trace_callback=update_trace,
+                    return_trace=True,
+                )
+                st.session_state.agent_history = updated_history
+                st.session_state.trace_events = trace_events
+                render_trace_panel(trace_placeholder)
+            except Exception as exc:
+                reply = f"⚠️ Error: {exc}"
+                st.session_state.trace_events.append(f"Run failed: {exc}")
+                render_trace_panel(trace_placeholder)
 
         st.session_state.ui_messages.append({"role": "assistant", "content": reply})
+        st.rerun()
 
 
 # ****************************************
 # Page setup and styling must load before the layout.
 # ****************************************
 st.set_page_config(
-    page_title="Dental Agentic AI Modern Clinic",
+    page_title="Dental Care Command Center",
     page_icon="✨",
     layout="wide",
 )
@@ -236,6 +295,17 @@ MODERN_CSS = """
         background: linear-gradient(145deg, #f4f7fb 0%, #ddeaf4 42%, #c7e3dc 100%);
         color: #10233a;
     }
+    div[data-testid="stDialog"] div[role="dialog"] {
+        width: min(1180px, 96vw);
+        max-width: min(1180px, 96vw);
+    }
+    div[data-testid="stDialog"] table {
+        width: 100%;
+    }
+    div[data-testid="stDialog"] th,
+    div[data-testid="stDialog"] td {
+        white-space: nowrap;
+    }
     .panel {
         border-radius: 18px;
         padding: 1rem 1.2rem;
@@ -244,6 +314,48 @@ MODERN_CSS = """
         box-shadow: 0 12px 30px rgba(15, 23, 42, 0.10);
         backdrop-filter: blur(10px);
         margin-bottom: 1rem;
+    }
+    .trace-panel {
+        height: 760px;
+        display: flex;
+        flex-direction: column;
+    }
+    .trace-log {
+        height: 100%;
+        min-height: 0;
+        overflow-y: auto;
+        margin-top: 0.8rem;
+        padding-right: 0.2rem;
+        border-top: 1px solid rgba(148, 163, 184, 0.18);
+    }
+    .trace-entry {
+        display: grid;
+        grid-template-columns: 2.4rem 1fr;
+        gap: 0.55rem;
+        align-items: start;
+        padding: 0.55rem 0;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+        font-size: 0.94rem;
+    }
+    .trace-index {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 1.7rem;
+        border-radius: 999px;
+        background: #103b66;
+        color: #f8fafc;
+        font-weight: 700;
+        font-size: 0.78rem;
+    }
+    .trace-text {
+        color: #10233a;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    .trace-empty {
+        padding: 1rem 0;
+        color: rgba(16, 35, 58, 0.72);
     }
     .panel h1, .panel h3, .panel p, .panel li {
         color: #10233a;
@@ -302,7 +414,7 @@ MODERN_CSS = """
 """
 
 st.markdown(MODERN_CSS, unsafe_allow_html=True)
-render_sidebar("✨ Modern Clinic Control")
+render_sidebar("✨ Dental Care Command Center")
 
 # ****************************************
 # Main layout guides first-time staff through the app.
@@ -312,7 +424,7 @@ with header_left:
     st.markdown(
         """
         <div class="panel">
-            <h1>✨ Modern Clinic Dashboard UI</h1>
+            <h1>✨ Dental Care Command Center</h1>
             <p>A premium clinic experience for appointments, schedules, and patient support.</p>
             <div>
                 <span class="agent-chip">🤖 Supervisor Agent</span>
@@ -389,4 +501,10 @@ with info_right:
         unsafe_allow_html=True,
     )
 
-render_chat_area("Ask the modern clinic assistant anything about appointments...")
+chat_column, trace_column = st.columns([1.45, 1], gap="large")
+with trace_column:
+    trace_placeholder = st.empty()
+    render_trace_panel(trace_placeholder)
+
+with chat_column:
+    render_chat_area(trace_placeholder, "Ask the modern clinic assistant anything about appointments...")
