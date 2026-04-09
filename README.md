@@ -41,11 +41,26 @@ The system follows a supervisor pattern where a central coordinator analyzes use
 
 ### Agent Responsibilities
 
-- **Supervisor**: Analyzes user input, classifies intent (get_info, book, cancel, reschedule, end), and routes to the appropriate agent
-- **Info Agent**: Handles queries about available slots, doctor schedules, and patient appointment lookups
-- **Booking Agent**: Collects booking details and creates new appointments
-- **Cancellation Agent**: Handles appointment cancellation requests
-- **Rescheduling Agent**: Manages moving appointments to different time slots
+- **Supervisor**: Analyzes user input, classifies intent (`get_info`, `book`, `cancel`, `reschedule`, `end`), and routes to the appropriate agent.
+- **Info Agent**: Handles queries about available slots, doctor schedules, and patient appointment lookups.
+- **Booking Agent**: Collects booking details and creates new appointments.
+- **Cancellation Agent**: Handles appointment cancellation requests.
+- **Rescheduling Agent**: Manages moving appointments to different time slots.
+
+### Agent Tools Used
+
+- **Supervisor**: No direct SQLite read/write tools; this agent only routes requests.
+- **Info Agent**
+  - **SQLite read tools**: `get_available_slots`, `get_patient_appointments`, `check_slot_availability`, `list_doctors_by_specialization`
+- **Booking Agent**
+  - **SQLite read tools**: `get_available_slots`, `check_slot_availability`
+  - **SQLite write tool**: `book_appointment`
+- **Cancellation Agent**
+  - **SQLite read tool**: `get_patient_appointments`
+  - **SQLite write tool**: `cancel_appointment`
+- **Rescheduling Agent**
+  - **SQLite read tools**: `get_patient_appointments`, `get_available_slots`
+  - **SQLite write tool**: `reschedule_appointment`
 
 ### Technology Stack
 
@@ -71,8 +86,8 @@ dental_agent_project/
 │   ├── models/
 │   │   └── state.py                 # State schema definitions
 │   ├── tools/
-│   │   ├── csv_reader.py            # Read operations (query tools)
-│   │   └── csv_writer.py            # Write operations (mutation tools)
+│   │   ├── sqllite_reader.py        # SQLite read operations (query tools)
+│   │   └── sqllite_writer.py        # SQLite write operations (mutation tools)
 │   ├── agents/
 │   │   ├── supervisor.py            # Intent classification & routing
 │   │   ├── info_agent.py            # Information queries
