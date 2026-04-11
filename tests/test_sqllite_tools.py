@@ -180,6 +180,37 @@ class SQLiteToolsTests(unittest.TestCase):
         self.assertTrue(results)
         self.assertLessEqual(len(results), 20)
 
+    def test_get_available_slots_with_part_of_day_filters_to_morning_only(self) -> None:
+        row = self._fetch_one(
+            """
+            SELECT date_slot, specialization, doctor_name
+            FROM doctor_availability
+            WHERE is_available = 1
+              AND time(date_slot) >= '05:00:00'
+              AND time(date_slot) < '12:00:00'
+              AND date(date_slot) >= ?
+            ORDER BY datetime(date_slot)
+            LIMIT 1
+            """,
+            (datetime.now().date().isoformat(),),
+        )
+        parsed = datetime.fromisoformat(row["date_slot"])
+
+        results = sqllite_reader.get_available_slots.invoke(
+            {
+                "specialization": row["specialization"],
+                "doctor_name": row["doctor_name"],
+                "date_filter": f"{parsed.month}/{parsed.day}/{parsed.year}",
+                "part_of_day": "morning",
+            }
+        )
+
+        self.assertTrue(results)
+        for item in results:
+            hour = datetime.strptime(item["date_slot"], "%m/%d/%Y %H:%M").hour
+            self.assertGreaterEqual(hour, 5)
+            self.assertLess(hour, 12)
+
     def test_get_patient_appointments_with_blank_input_returns_empty_list(self) -> None:
         results = sqllite_reader.get_patient_appointments.invoke({"patient_id": ""})
         self.assertEqual(results, [])
@@ -201,6 +232,58 @@ class SQLiteToolsTests(unittest.TestCase):
 
         self.assertFalse(result["success"])
         self.assertIn("Invalid date_slot format", result["message"])
+
+    def test_book_first_available_appointment_books_earliest_matching_morning_slot(self) -> None:
+        row = self._fetch_one(
+            """
+            SELECT date_slot, specialization, doctor_name
+            FROM doctor_availability
+            WHERE is_available = 1
+              AND time(date_slot) >= '05:00:00'
+              AND time(date_slot) < '12:00:00'
+              AND date(date_slot) >= ?
+            ORDER BY datetime(date_slot), doctor_name
+            LIMIT 1
+            """,
+            (datetime.now().date().isoformat(),),
+        )
+        parsed = datetime.fromisoformat(row["date_slot"])
+        expected_slot = sqllite_reader._format_date_slot(row["date_slot"])
+
+        result = sqllite_writer.book_first_available_appointment.invoke(
+            {
+                "patient_id": "FLEX1001",
+                "specialization": row["specialization"],
+                "doctor_name": row["doctor_name"],
+                "date_filter": f"{parsed.month}/{parsed.day}/{parsed.year}",
+                "part_of_day": "morning",
+            }
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["doctor_name"], row["doctor_name"])
+        self.assertEqual(result["date_slot"], expected_slot)
+
+        availability = sqllite_reader.check_slot_availability.invoke(
+            {"doctor_name": row["doctor_name"], "date_slot": expected_slot}
+        )
+        self.assertTrue(availability["found"])
+        self.assertFalse(availability["is_available"])
+        self.assertEqual(availability["patient_to_attend"], "FLEX1001")
+
+    def test_book_first_available_appointment_returns_clear_failure_when_no_match_exists(self) -> None:
+        result = sqllite_writer.book_first_available_appointment.invoke(
+            {
+                "patient_id": "FLEX404",
+                "specialization": "general dentist",
+                "doctor_name": "john doe",
+                "date_filter": "4/11/2026",
+                "part_of_day": "morning",
+            }
+        )
+
+        self.assertFalse(result["success"])
+        self.assertIn("No available slot found on 4/11/2026", result["message"])
 
     def test_cancel_missing_booking_returns_expected_failure(self) -> None:
         result = sqllite_writer.cancel_appointment.invoke(

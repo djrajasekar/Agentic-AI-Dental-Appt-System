@@ -57,6 +57,18 @@ def _format_date_slot(value: str) -> str:
     return f"{parsed.month}/{parsed.day}/{parsed.year} {parsed.hour}:{parsed.minute:02d}"
 
 
+def _part_of_day_bounds(value: str) -> tuple[str, str] | None:
+    """Map a natural-language time window to SQLite-friendly lower and upper bounds."""
+    normalized = str(value or "").strip().lower()
+    if normalized in {"morning", "am", "early"}:
+        return ("05:00:00", "12:00:00")
+    if normalized in {"afternoon", "pm"}:
+        return ("12:00:00", "17:00:00")
+    if normalized in {"evening", "night", "late"}:
+        return ("17:00:00", "21:00:00")
+    return None
+
+
 # ****************************************
 # Public read tools expose appointment lookup behavior.
 # ****************************************
@@ -65,6 +77,7 @@ def get_available_slots(
     specialization: str = "",
     doctor_name: str = "",
     date_filter: str = "",
+    part_of_day: str = "",
 ) -> list:
     """Return available appointment slots from SQLite.
 
@@ -72,6 +85,7 @@ def get_available_slots(
         specialization: Optional dentist specialty filter such as `orthodontist`.
         doctor_name: Optional doctor name filter for narrowing the results.
         date_filter: Optional date text used to match one day of appointments.
+        part_of_day: Optional time window such as `morning`, `afternoon`, or `evening`.
 
     Returns:
         list: A list of dictionaries containing `date_slot`, `specialization`, and `doctor_name`.
@@ -91,6 +105,12 @@ def get_available_slots(
         if parsed_date is not None:
             clauses.append("date(date_slot) = ?")
             params.append(parsed_date.date().isoformat())
+    if part_of_day:
+        bounds = _part_of_day_bounds(part_of_day)
+        if bounds is not None:
+            clauses.append("time(date_slot) >= ?")
+            clauses.append("time(date_slot) < ?")
+            params.extend(bounds)
 
     query = f"""
         SELECT date_slot, specialization, doctor_name

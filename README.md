@@ -47,20 +47,22 @@ The system follows a supervisor pattern where a central coordinator analyzes use
 - **Cancellation Agent**: Handles appointment cancellation requests.
 - **Rescheduling Agent**: Manages moving appointments to different time slots.
 
+
 ### Agent Tools Used
 
 - **Supervisor**: No direct SQLite read/write tools; this agent only routes requests.
 - **Info Agent**
-  - **SQLite read tools**: `get_available_slots`, `get_patient_appointments`, `check_slot_availability`, `list_doctors_by_specialization`
+   - **SQLite read tools**: `get_available_slots`, `get_patient_appointments`, `check_slot_availability`, `list_doctors_by_specialization`
 - **Booking Agent**
-  - **SQLite read tools**: `get_available_slots`, `check_slot_availability`
-  - **SQLite write tool**: `book_appointment`
+   - **SQLite read tools**: `get_available_slots`, `check_slot_availability`
+   - **SQLite write tools**: `book_appointment`, `book_first_available_appointment`
+      - `book_first_available_appointment` enables flexible booking for requests like "book in the morning" or "if available, book it"—the agent will find and book the earliest matching slot for the requested window (morning, afternoon, evening) without requiring an exact time.
 - **Cancellation Agent**
-  - **SQLite read tool**: `get_patient_appointments`
-  - **SQLite write tool**: `cancel_appointment`
+   - **SQLite read tool**: `get_patient_appointments`
+   - **SQLite write tool**: `cancel_appointment`
 - **Rescheduling Agent**
-  - **SQLite read tools**: `get_patient_appointments`, `get_available_slots`
-  - **SQLite write tool**: `reschedule_appointment`
+   - **SQLite read tools**: `get_patient_appointments`, `get_available_slots`
+   - **SQLite write tool**: `reschedule_appointment`
 
 ### Technology Stack
 
@@ -166,6 +168,7 @@ Then open the local browser URL shown by Streamlit, usually `http://localhost:85
    - `Cancel appointment for patient 1000082 at 5/10/2026 9:00`
    - `Reschedule patient 1000082 from 5/10/2026 9:00 to 5/12/2026 10:00`
 
+
 ### Example Interactions
 
 **Check Available Slots:**
@@ -179,7 +182,7 @@ Agent: Here are the available orthodontist appointments:
 ...
 ```
 
-**Book an Appointment:**
+**Book an Appointment (Exact Time):**
 
 ```
 You: Book patient 1000082 with Emily Johnson on 5/10/2026 9:00
@@ -189,6 +192,20 @@ I've booked the appointment:
 - Doctor: Emily Johnson
 - Date/Time: 5/10/2026 9:00
 - Specialization: orthodontist
+```
+
+**Book an Appointment (Flexible Time):**
+
+```
+You: Check available general dentist slots for John Doe on 4/15/2026, if available book it with patient id - 1000082 - on morning time
+Agent: I've booked a general dentist appointment for patient 1000082 with Dr. John Doe on 4/15/2026 at 9:30 AM.
+```
+
+**Book an Appointment (No Slot Available):**
+
+```
+You: Check available general dentist slots for John Doe on 4/11/2026, if available book it with patient id - 1000082 - on morning time
+Agent: I couldn't find any available slots for a general dentist with John Doe on 4/11/2026 in the morning.
 ```
 
 **Check Patient Appointments:**

@@ -22,6 +22,7 @@ build/
 
 # Logs
 *.log
+Presentation/
 
 # SQLite databases
 #*.db
@@ -29,5 +30,3 @@ build/
 
 Presentation files
 *.txt
-# *.pptx
-Comprehending Agentic AI With Multi Agent Intelligence.pptx

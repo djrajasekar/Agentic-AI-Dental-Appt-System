@@ -40,6 +40,27 @@ def _parse_date_slot(value: str):
         return None
 
 
+def _normalize_specialization(value: str) -> str:
+    """Tolerate spaces, hyphens, and plurals from natural-language requests."""
+    normalized = str(value).strip().lower().replace("_", " ").replace("-", " ")
+    normalized = " ".join(normalized.split())
+    if normalized.endswith("s"):
+        normalized = normalized[:-1]
+    return normalized.replace(" ", "_")
+
+
+def _part_of_day_bounds(value: str) -> tuple[str, str] | None:
+    """Map a natural-language time window to SQLite-friendly lower and upper bounds."""
+    normalized = str(value or "").strip().lower()
+    if normalized in {"morning", "am", "early"}:
+        return ("05:00:00", "12:00:00")
+    if normalized in {"afternoon", "pm"}:
+        return ("12:00:00", "17:00:00")
+    if normalized in {"evening", "night", "late"}:
+        return ("17:00:00", "21:00:00")
+    return None
+
+
 # ****************************************
 # Public write tools change booking state in SQLite.
 # ****************************************
@@ -91,6 +112,97 @@ def book_appointment(patient_id: str, doctor_name: str, date_slot: str) -> dict:
     return {
         "success": True,
         "message": f"Appointment booked for patient {patient_id} with {doctor_name} at {date_slot}.",
+    }
+
+
+@tool
+def book_first_available_appointment(
+    patient_id: str,
+    date_filter: str,
+    specialization: str = "",
+    doctor_name: str = "",
+    part_of_day: str = "",
+) -> dict:
+    """Book the earliest available slot that matches a flexible date and time-window request.
+
+    Args:
+        patient_id: The patient identifier to attach to the booked slot.
+        date_filter: The requested appointment day.
+        specialization: Optional dentist specialty filter.
+        doctor_name: Optional doctor name filter.
+        part_of_day: Optional time window such as `morning`, `afternoon`, or `evening`.
+
+    Returns:
+        dict: A status dictionary describing whether a matching slot was booked.
+    """
+    patient_value = str(patient_id or "").strip()
+    if not patient_value:
+        return {"success": False, "message": "patient_id is required to book an appointment."}
+
+    target_dt = _parse_date_slot(date_filter)
+    if target_dt is None:
+        return {"success": False, "message": f"Invalid date_filter format: {date_filter}"}
+
+    clauses = ["is_available = 1", "date(date_slot) = ?"]
+    params: list[object] = [target_dt.date().isoformat()]
+
+    if specialization:
+        clauses.append("lower(specialization) = ?")
+        params.append(_normalize_specialization(specialization))
+    if doctor_name:
+        clauses.append("lower(doctor_name) = ?")
+        params.append(doctor_name.lower().strip())
+    if part_of_day:
+        bounds = _part_of_day_bounds(part_of_day)
+        if bounds is not None:
+            clauses.append("time(date_slot) >= ?")
+            clauses.append("time(date_slot) < ?")
+            params.extend(bounds)
+
+    query = f"""
+        SELECT id, date_slot, doctor_name, specialization
+        FROM {TABLE_NAME}
+        WHERE {' AND '.join(clauses)}
+        ORDER BY datetime(date_slot), doctor_name
+        LIMIT 1
+    """
+
+    with closing(_connect()) as conn:
+        row = conn.execute(query, params).fetchone()
+        if row is None:
+            details = []
+            if specialization:
+                details.append(f"specialization={_normalize_specialization(specialization)}")
+            if doctor_name:
+                details.append(f"doctor={doctor_name.strip()}")
+            if part_of_day:
+                details.append(f"time_window={part_of_day.strip()}")
+            filters = ", ".join(details) if details else "the requested filters"
+            return {
+                "success": False,
+                "message": f"No available slot found on {target_dt.month}/{target_dt.day}/{target_dt.year} for {filters}.",
+            }
+
+        conn.execute(
+            f"""
+            UPDATE {TABLE_NAME}
+            SET is_available = 0, patient_to_attend = ?
+            WHERE id = ?
+            """,
+            (patient_value, row["id"]),
+        )
+        conn.commit()
+
+    booked_date = pd.to_datetime(row["date_slot"]).to_pydatetime()
+    formatted_slot = f"{booked_date.month}/{booked_date.day}/{booked_date.year} {booked_date.hour}:{booked_date.minute:02d}"
+    return {
+        "success": True,
+        "doctor_name": row["doctor_name"],
+        "specialization": row["specialization"],
+        "date_slot": formatted_slot,
+        "message": (
+            f"Appointment booked for patient {patient_value} with {row['doctor_name']} at {formatted_slot}."
+        ),
     }
 
 
