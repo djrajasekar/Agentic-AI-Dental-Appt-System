@@ -7,7 +7,7 @@ Cancellation specialist for booked visits.
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.prebuilt import ToolNode
-from dental_agent.config.settings import GOOGLE_API_KEY, MODEL_NAME, TEMPERATURE
+from dental_agent.config.settings import GOOGLE_API_KEY, get_model_name, TEMPERATURE
 from dental_agent.models.state import AppointmentState
 from dental_agent.tools.sqllite_reader import get_patient_appointments
 from dental_agent.tools.sqllite_writer import cancel_appointment
@@ -62,7 +62,7 @@ def cancellation_agent_node(state: AppointmentState) -> dict:
     """Run the cancellation specialist and return either tool calls or the final reply."""
     llm = ChatGoogleGenerativeAI(
         google_api_key=GOOGLE_API_KEY,
-        model=MODEL_NAME,
+        model=get_model_name(),
         temperature=TEMPERATURE,
     ).bind_tools(CANCEL_TOOLS)
 

@@ -52,8 +52,24 @@ DB_PATH = BASE_DIR / "doctor_availability.db"
 # Model settings centralize runtime configuration.
 # ****************************************
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY", "")
-MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.5-flash")
+_DEFAULT_MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.5-flash")
+_ACTIVE_MODEL_NAME = _DEFAULT_MODEL_NAME
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0"))
+
+
+def get_model_name() -> str:
+    """Get the currently active model name (supports runtime switching on 503 errors)."""
+    return _ACTIVE_MODEL_NAME
+
+
+def set_model_name(model_name: str) -> None:
+    """Set the active model name for all subsequent LLM calls."""
+    global _ACTIVE_MODEL_NAME
+    _ACTIVE_MODEL_NAME = model_name
+
+
+# Maintain backward compatibility with direct MODEL_NAME access
+MODEL_NAME = _DEFAULT_MODEL_NAME
 
 # ****************************************
 # Domain lists keep validation and UI choices aligned.

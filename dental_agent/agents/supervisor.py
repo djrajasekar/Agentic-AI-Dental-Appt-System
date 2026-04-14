@@ -7,7 +7,7 @@ Intent router for specialist handoffs.
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
-from dental_agent.config.settings import GOOGLE_API_KEY, MODEL_NAME, TEMPERATURE
+from dental_agent.config.settings import GOOGLE_API_KEY, get_model_name, TEMPERATURE
 from dental_agent.models.state import AppointmentState, RouteTarget
 from dental_agent.utils import sanitize_messages
 
@@ -63,7 +63,7 @@ def supervisor_node(state: AppointmentState) -> dict:
     """Classify the latest user intent and choose the next specialist agent."""
     llm = ChatGoogleGenerativeAI(
         google_api_key=GOOGLE_API_KEY,
-        model=MODEL_NAME,
+        model=get_model_name(),
         temperature=TEMPERATURE,
     ).with_structured_output(SupervisorDecision)
 
