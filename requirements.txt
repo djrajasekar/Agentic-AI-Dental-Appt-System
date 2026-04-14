@@ -1,0 +1,8 @@
+langchain-core
+langgraph
+langchain-google-genai
+pandas
+pydantic
+python-dotenv
+streamlit
+truststore
