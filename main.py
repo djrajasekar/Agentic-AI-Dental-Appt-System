@@ -264,7 +264,7 @@ def process_user_message(
     except Exception as exc:
         # If 503 error, switch to fallback model and retry once
         if _is_503_unavailable_error(exc):
-            emit_trace("Model overloaded", "Switching to gemini-1.5-flash")
+            emit_trace("Model overloaded", "Retrying with gemini-1.5-pro")
             from dental_agent.config.settings import set_model_name
             from dental_agent.agent import get_dental_graph
             
@@ -276,40 +276,45 @@ def process_user_message(
             previous_message_count = len(working_history)
             
             # Switch model and rebuild workflow graph
-            set_model_name("gemini-1.5-flash")
+            set_model_name("gemini-1.5-pro")
             graph = get_dental_graph()
             
             # Retry with fallback model
-            for event_type, data in graph.stream(
-                {"messages": working_history},
-                stream_mode=stream_modes,
-                config={"recursion_limit": 20},
-            ):
-                if event_type == "messages":
-                    chunk, meta = data
-                    should_append, node_name = _emit_stream_trace(
-                        chunk,
-                        meta,
-                        seen_nodes,
-                        seen_tool_calls,
-                        seen_streaming_nodes,
-                        emit_trace,
-                    )
-                    if should_append and node_name != "supervisor":
-                        response_chunks.append(_content_to_text(chunk.content))
-                elif event_type == "updates" and isinstance(data, dict):
-                    for node_name, node_update in data.items():
-                        if isinstance(node_update, dict):
-                            _emit_workflow_update_trace(node_name, node_update, emit_trace)
-                elif event_type == "values" and isinstance(data, dict):
-                    final_messages = data.get("messages", [])
-                    previous_message_count = _emit_value_trace(
-                        final_messages,
-                        previous_message_count,
-                        emit_trace,
-                        include_tool_messages=False,
-                    )
-            emit_trace("Retry succeeded", "Using gemini-1.5-flash due to high demand")
+            try:
+                for event_type, data in graph.stream(
+                    {"messages": working_history},
+                    stream_mode=stream_modes,
+                    config={"recursion_limit": 20},
+                ):
+                    if event_type == "messages":
+                        chunk, meta = data
+                        should_append, node_name = _emit_stream_trace(
+                            chunk,
+                            meta,
+                            seen_nodes,
+                            seen_tool_calls,
+                            seen_streaming_nodes,
+                            emit_trace,
+                        )
+                        if should_append and node_name != "supervisor":
+                            response_chunks.append(_content_to_text(chunk.content))
+                    elif event_type == "updates" and isinstance(data, dict):
+                        for node_name, node_update in data.items():
+                            if isinstance(node_update, dict):
+                                _emit_workflow_update_trace(node_name, node_update, emit_trace)
+                    elif event_type == "values" and isinstance(data, dict):
+                        final_messages = data.get("messages", [])
+                        previous_message_count = _emit_value_trace(
+                            final_messages,
+                            previous_message_count,
+                            emit_trace,
+                            include_tool_messages=False,
+                        )
+                    emit_trace("Retry succeeded", "Using gemini-1.5-pro due to high demand on 2.5-flash")
+            except Exception as fallback_exc:
+                # Log the fallback failure but raise the original error
+                emit_trace("Fallback failed", str(fallback_exc)[:120])
+                raise exc  # Re-raise original 503 error
         else:
             # Re-raise if not a 503 error
             raise
