@@ -149,9 +149,10 @@ python main.py
 
 ### Running the Modern Clinic UI
 
-Launch the frontend:
+Activate the virtual environment and launch the frontend:
 
 ```bash
+source .venv/bin/activate
 streamlit run modern_clinic_ui.py
 ```
 
