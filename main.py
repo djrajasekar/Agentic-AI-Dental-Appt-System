@@ -268,7 +268,7 @@ def process_user_message(
             from dental_agent.agent import get_dental_graph
 
             original_model = get_model_name()
-            fallback_models = ["gemini-2.0-flash", "gemini-2.5-pro"]
+            fallback_models = ["gemini-3.1-flash-lite-preview", "gemini-2.5-pro"]
             fallback_error = None
 
             for fallback_model in fallback_models:
