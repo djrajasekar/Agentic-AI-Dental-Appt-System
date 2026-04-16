@@ -8,7 +8,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage
 from langgraph.prebuilt import create_react_agent
 
-from dental_agent.config.settings import GOOGLE_API_KEY, MODEL_NAME, TEMPERATURE
+from dental_agent.config.settings import GOOGLE_API_KEY, get_model_name, TEMPERATURE
 from dental_agent.utils import sanitize_messages
 from dental_agent.tools.sqllite_reader import (
     get_available_slots,
@@ -76,12 +76,30 @@ def _pre_model_hook(state: dict) -> dict:
 
 
 # ****************************************
-# Model and graph setup are created once for reuse.
+# Model and graph setup with fallback support for high-demand scenarios.
 # ****************************************
-llm = ChatGoogleGenerativeAI(
-    google_api_key=GOOGLE_API_KEY,
-    model=MODEL_NAME,
-    temperature=TEMPERATURE,
-)
+_CACHED_GRAPH = None
 
-dental_graph = create_react_agent(model=llm, tools=TOOLS, pre_model_hook=_pre_model_hook)
+
+def _create_llm():
+    """Create LLM instance with the currently active model."""
+    return ChatGoogleGenerativeAI(
+        google_api_key=GOOGLE_API_KEY,
+        model=get_model_name(),
+        temperature=TEMPERATURE,
+    )
+
+
+def get_dental_graph():
+    """Get the dental graph, rebuilt with the currently active model."""
+    global _CACHED_GRAPH
+    
+    # Always create a fresh graph to pick up any model changes
+    llm = _create_llm()
+    _CACHED_GRAPH = create_react_agent(model=llm, tools=TOOLS, pre_model_hook=_pre_model_hook)
+    
+    return _CACHED_GRAPH
+
+
+# Build the default graph
+dental_graph = get_dental_graph()

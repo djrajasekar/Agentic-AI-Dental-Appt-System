@@ -102,6 +102,12 @@ def _get_workflow_graph():
     return _WORKFLOW_GRAPH
 
 
+def _is_503_unavailable_error(exc: Exception) -> bool:
+    """Detect if an exception is a 503 UNAVAILABLE error from Gemini API."""
+    error_msg = str(exc).lower()
+    return "503" in error_msg and "unavailable" in error_msg
+
+
 def _emit_stream_trace(
     chunk,
     meta,
@@ -196,7 +202,10 @@ def process_user_message(
     trace_callback=None,
     return_trace: bool = False,
 ):
-    """Run one user turn through the supervisor-driven workflow for both CLI and UI."""
+    """Run one user turn through the supervisor-driven workflow for both CLI and UI.
+
+    Automatically retries with supported fallback models when the primary model returns 503.
+    """
     working_history = list(history)
     working_history.append(HumanMessage(content=user_input))
 
@@ -216,40 +225,110 @@ def process_user_message(
 
     emit_trace("User request received", _shorten_trace_value(user_input, limit=120))
     emit_trace("LangGraph run started", "Streaming the supervisor-driven multi-agent workflow")
+    
+    # Try with the configured model first, then use supported alternates on 503.
     graph = _get_workflow_graph()
     stream_modes = ["updates", "messages", "values"]
 
-    # Stream both partial text and the final state so the next turn keeps full context.
-    for event_type, data in graph.stream(
-        {"messages": working_history},
-        stream_mode=stream_modes,
-        config={"recursion_limit": 20},
-    ):
-        if event_type == "messages":
-            chunk, meta = data
-            # Keep the console response clean by skipping tool payloads.
-            should_append, node_name = _emit_stream_trace(
-                chunk,
-                meta,
-                seen_nodes,
-                seen_tool_calls,
-                seen_streaming_nodes,
-                emit_trace,
-            )
-            if should_append and node_name != "supervisor":
-                response_chunks.append(_content_to_text(chunk.content))
-        elif event_type == "updates" and isinstance(data, dict):
-            for node_name, node_update in data.items():
-                if isinstance(node_update, dict):
-                    _emit_workflow_update_trace(node_name, node_update, emit_trace)
-        elif event_type == "values" and isinstance(data, dict):
-            final_messages = data.get("messages", [])
-            previous_message_count = _emit_value_trace(
-                final_messages,
-                previous_message_count,
-                emit_trace,
-                include_tool_messages=False,
-            )
+    try:
+        for event_type, data in graph.stream(
+            {"messages": working_history},
+            stream_mode=stream_modes,
+            config={"recursion_limit": 20},
+        ):
+            if event_type == "messages":
+                chunk, meta = data
+                # Keep the console response clean by skipping tool payloads.
+                should_append, node_name = _emit_stream_trace(
+                    chunk,
+                    meta,
+                    seen_nodes,
+                    seen_tool_calls,
+                    seen_streaming_nodes,
+                    emit_trace,
+                )
+                if should_append and node_name != "supervisor":
+                    response_chunks.append(_content_to_text(chunk.content))
+            elif event_type == "updates" and isinstance(data, dict):
+                for node_name, node_update in data.items():
+                    if isinstance(node_update, dict):
+                        _emit_workflow_update_trace(node_name, node_update, emit_trace)
+            elif event_type == "values" and isinstance(data, dict):
+                final_messages = data.get("messages", [])
+                previous_message_count = _emit_value_trace(
+                    final_messages,
+                    previous_message_count,
+                    emit_trace,
+                    include_tool_messages=False,
+                )
+    except Exception as exc:
+        # If 503 error, switch to supported fallback models and retry.
+        if _is_503_unavailable_error(exc):
+            from dental_agent.config.settings import get_model_name, set_model_name
+            from dental_agent.agent import get_dental_graph
+
+            original_model = get_model_name()
+            fallback_models = ["gemini-3.1-flash-lite-preview", "gemini-2.5-pro"]
+            fallback_error = None
+
+            for fallback_model in fallback_models:
+                emit_trace("Model overloaded", f"Retrying with {fallback_model}")
+
+                # Reset stream accumulators before each retry.
+                response_chunks = []
+                seen_nodes = set()
+                seen_tool_calls = set()
+                seen_streaming_nodes = set()
+                previous_message_count = len(working_history)
+
+                try:
+                    set_model_name(fallback_model)
+                    graph = get_dental_graph()
+
+                    for event_type, data in graph.stream(
+                        {"messages": working_history},
+                        stream_mode=stream_modes,
+                        config={"recursion_limit": 20},
+                    ):
+                        if event_type == "messages":
+                            chunk, meta = data
+                            should_append, node_name = _emit_stream_trace(
+                                chunk,
+                                meta,
+                                seen_nodes,
+                                seen_tool_calls,
+                                seen_streaming_nodes,
+                                emit_trace,
+                            )
+                            if should_append and node_name != "supervisor":
+                                response_chunks.append(_content_to_text(chunk.content))
+                        elif event_type == "updates" and isinstance(data, dict):
+                            for node_name, node_update in data.items():
+                                if isinstance(node_update, dict):
+                                    _emit_workflow_update_trace(node_name, node_update, emit_trace)
+                        elif event_type == "values" and isinstance(data, dict):
+                            final_messages = data.get("messages", [])
+                            previous_message_count = _emit_value_trace(
+                                final_messages,
+                                previous_message_count,
+                                emit_trace,
+                                include_tool_messages=False,
+                            )
+
+                    emit_trace("Retry succeeded", f"Using {fallback_model} due to high demand")
+                    break
+                except Exception as fallback_exc:
+                    fallback_error = fallback_exc
+                    emit_trace("Fallback failed", _shorten_trace_value(str(fallback_exc), limit=120))
+            else:
+                # All fallbacks failed; surface the original error context.
+                set_model_name(original_model)
+                raise exc
+
+            # Keep whichever model worked active for this process.
+        else:
+            # Re-raise if not a 503 error
+            raise
 
     response_text = "".join(response_chunks).strip()
     updated_history = final_messages if final_messages else working_history
