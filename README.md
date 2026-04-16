@@ -13,6 +13,18 @@ This system provides a chat-based interface for patients and clinic staff to:
 
 The system uses a supervisor agent that intelligently routes user requests to the appropriate specialized agent based on the detected intent, making it an excellent educational example of multi-agent AI systems.
 
+## AI Agent Instructions (`AGENTS.md`)
+
+This repository includes an `AGENTS.md` file at the project root that defines shared working guidelines for AI coding agents.
+
+- Keep changes minimal, safe, and scoped to the requested task
+- Preserve existing behavior unless a change is explicitly requested
+- Avoid unrelated refactors and unnecessary dependencies
+- Run relevant validation (tests/lint/build) before claiming completion
+- Keep documentation in sync when behavior or setup changes
+
+If you are using an AI coding assistant in this repository, review `AGENTS.md` before making changes.
+
 ## Architecture
 
 ### Multi-Agent Design
@@ -77,6 +89,7 @@ The system follows a supervisor pattern where a central coordinator analyzes use
 
 ```
 dental_agent_project/
+├── AGENTS.md                       # Shared instructions for AI coding agents
 ├── main.py                          # Entry point - interactive CLI
 ├── doctor_availability.csv          # Source data used for imports
 ├── doctor_availability.db           # SQLite runtime store for appointments
