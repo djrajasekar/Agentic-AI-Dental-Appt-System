@@ -311,11 +311,11 @@ def render_chat_area(trace_placeholder, placeholder: str, spinner_text: str = "T
             </div>''',
             unsafe_allow_html=True,
         )
-        for msg in st.session_state.ui_messages:
-            avatar = "🤖" if msg["role"] == "assistant" else "🙂"
-            with st.chat_message(msg["role"], avatar=avatar):
-                st.markdown(msg["content"])
-        # The chat hint is only shown in the empty state, not after each message
+    for msg in st.session_state.ui_messages:
+        avatar = "🤖" if msg["role"] == "assistant" else "🙂"
+        with st.chat_message(msg["role"], avatar=avatar):
+            st.markdown(msg["content"])
+    # The chat hint is only shown in the empty state, not after each message
     st.markdown('</div>', unsafe_allow_html=True)
 
     prompt = st.chat_input(placeholder)
