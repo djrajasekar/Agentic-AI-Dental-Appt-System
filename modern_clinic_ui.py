@@ -302,13 +302,17 @@ def render_post_trace_controls() -> None:
 
 def render_chat_area(trace_placeholder, placeholder: str, spinner_text: str = "Thinking with Gemini...") -> None:
     """Replay the visible transcript, then send each new prompt through the shared agent flow."""
+    st.markdown('<div class="chat-area-panel">', unsafe_allow_html=True)
+    if not st.session_state.ui_messages:
+        st.markdown(
+            '<div class="chat-cta"><button class="chat-cta-bubble" onclick="document.querySelector(\'textarea\').focus()">💬 Start your conversation</button></div>',
+            unsafe_allow_html=True,
+        )
     for msg in st.session_state.ui_messages:
         avatar = "🤖" if msg["role"] == "assistant" else "🙂"
         with st.chat_message(msg["role"], avatar=avatar):
-            if msg["role"] == "assistant":
-                st.markdown(msg["content"])
-            else:
-                st.markdown(msg["content"])
+            st.markdown(msg["content"])
+    st.markdown('</div>', unsafe_allow_html=True)
 
     prompt = st.chat_input(placeholder)
     if not prompt and st.session_state.pending_prompt:
