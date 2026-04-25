@@ -305,13 +305,17 @@ def render_chat_area(trace_placeholder, placeholder: str, spinner_text: str = "T
     st.markdown('<div class="chat-area-panel">', unsafe_allow_html=True)
     if not st.session_state.ui_messages:
         st.markdown(
-            '<div class="chat-cta"><button class="chat-cta-bubble" onclick="document.querySelector(\'textarea\').focus()">💬 Start your conversation</button></div>',
+            '''<div class="chat-cta">
+                <span>💬 Start the conversation</span>
+                <span class="chat-hint">&nbsp;|&nbsp;<b>Full Workflow trace</b> will appear after you start chatting.</span>
+            </div>''',
             unsafe_allow_html=True,
         )
-    for msg in st.session_state.ui_messages:
-        avatar = "🤖" if msg["role"] == "assistant" else "🙂"
-        with st.chat_message(msg["role"], avatar=avatar):
-            st.markdown(msg["content"])
+        for msg in st.session_state.ui_messages:
+            avatar = "🤖" if msg["role"] == "assistant" else "🙂"
+            with st.chat_message(msg["role"], avatar=avatar):
+                st.markdown(msg["content"])
+        # The chat hint is only shown in the empty state, not after each message
     st.markdown('</div>', unsafe_allow_html=True)
 
     prompt = st.chat_input(placeholder)
@@ -384,6 +388,14 @@ MODERN_CSS = """
         border: 1px solid rgba(148, 163, 184, 0.28);
         box-shadow: 0 12px 30px rgba(15, 23, 42, 0.10);
         backdrop-filter: blur(10px);
+        .chat-hint {
+            font-size: 1.05rem;
+            font-weight: 500;
+            color: #fffbe7;
+            opacity: 0.92;
+            margin-left: 0.5rem;
+            text-shadow: 0 1px 6px rgba(255, 152, 0, 0.18);
+        }
         margin-bottom: 1rem;
     }
     .trace-panel {
@@ -431,6 +443,18 @@ MODERN_CSS = """
     .panel h1, .panel h3, .panel p, .panel li {
         color: #10233a;
         margin-top: 0;
+    }
+    .panel h1 {
+        font-size: 2.1rem;
+        line-height: 1.15;
+        word-break: break-word;
+        white-space: normal;
+    }
+    @media (max-width: 600px) {
+        .panel h1 {
+            font-size: 1.35rem;
+            line-height: 1.18;
+        }
     }
     .agent-chip {
         display: inline-block;
