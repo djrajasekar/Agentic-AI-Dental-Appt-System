@@ -42,7 +42,7 @@ def init_ui_state() -> None:
     if "agent_history" not in st.session_state:
         st.session_state.agent_history = []
     if "ui_messages" not in st.session_state:
-        st.session_state.ui_messages = [{"role": "assistant", "content": WELCOME_MESSAGE}]
+        st.session_state.ui_messages = []
     if "pending_prompt" not in st.session_state:
         st.session_state.pending_prompt = None
     if "trace_events" not in st.session_state:
@@ -57,7 +57,7 @@ def queue_prompt(prompt_text: str) -> None:
 def clear_chat() -> None:
     """Reset only the visible conversation while leaving appointment data unchanged in SQLite."""
     st.session_state.agent_history = []
-    st.session_state.ui_messages = [{"role": "assistant", "content": WELCOME_MESSAGE}]
+    st.session_state.ui_messages = []
     st.session_state.pending_prompt = None
     st.session_state.trace_events = []
 
@@ -231,6 +231,20 @@ def _build_trace_markup() -> str:
 def render_trace_panel(trace_placeholder) -> None:
     """Refresh the side-panel trace without rerendering the rest of the page."""
     trace_placeholder.markdown(_build_trace_markup(), unsafe_allow_html=True)
+
+
+def render_welcome_panel() -> None:
+    """Keep the onboarding welcome message in a stable spot below the command center."""
+    st.markdown(
+        """
+        <div class="panel">
+            <h3>👋 Welcome to the Dental Agentic AI Assistant</h3>
+            <p>I can help you <strong>check slots</strong>, <strong>book appointments</strong>, <strong>cancel bookings</strong>, and <strong>reschedule visits</strong>.</p>
+            <p>Ask a question below or use quick actions from the left panel.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_chat_area(trace_placeholder, placeholder: str, spinner_text: str = "Thinking with Gemini...") -> None:
@@ -449,11 +463,25 @@ with header_right:
     )
     render_availability_lookup_button()
 
-metric1, metric2, metric3, metric4 = st.columns(4)
-metric1.metric("🤖 AI Status", "Ready")
-metric2.metric("🧠 Model", "Gemini")
-metric3.metric("📂 Data Source", "SQLite")
-metric4.metric("⚡ UI Mode", "Modern")
+with st.expander("⚙️ Assistant runtime details", expanded=True):
+    metric1, metric2, metric3, metric4 = st.columns(4)
+    metric1.metric("🤖 AI Status", "Ready")
+    metric2.metric("🧠 Model", "Gemini")
+    metric3.metric("📂 Data Source", "SQLite")
+    metric4.metric("⚡ UI Mode", "Modern")
+
+# ****************************************
+# Mobile-first order keeps chat before trace on narrow screens.
+# ****************************************
+render_welcome_panel()
+
+chat_column, trace_column = st.columns([1.45, 1], gap="large")
+trace_placeholder = trace_column.empty()
+with chat_column:
+    render_chat_area(trace_placeholder, "Ask the modern clinic assistant anything about appointments...")
+
+with trace_column:
+    render_trace_panel(trace_placeholder)
 
 # This middle section helps first-time users understand what the assistant can do.
 info_left, info_middle, info_right = st.columns([1.15, 1.45, 1])
@@ -500,11 +528,3 @@ with info_right:
         """,
         unsafe_allow_html=True,
     )
-
-chat_column, trace_column = st.columns([1.45, 1], gap="large")
-with trace_column:
-    trace_placeholder = st.empty()
-    render_trace_panel(trace_placeholder)
-
-with chat_column:
-    render_chat_area(trace_placeholder, "Ask the modern clinic assistant anything about appointments...")
