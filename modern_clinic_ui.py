@@ -647,7 +647,7 @@ with info_right:
         """
         <div class="panel">
             <h3>📌 Live lookup</h3>
-            <p>Use the top-right search button anytime to filter slot availability by date, doctor, specialization, or booking status.</p>
+            <p>Use the <b>Quick Search</b> and <b>Search doctor availability</b> options to filter slot availability by date, doctor, specialization, or booking status.</p>
         </div>
         """,
         unsafe_allow_html=True,
