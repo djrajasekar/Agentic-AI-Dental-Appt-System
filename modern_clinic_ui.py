@@ -477,6 +477,37 @@ MODERN_CSS = """
         background: rgba(255, 255, 255, 0.96);
         color: #10233a;
     }
+    .post-trace-controls {
+        width: 100%;
+        max-width: 100vw;
+        margin: 0 auto 1.5rem auto;
+        display: block;
+    }
+    .post-trace-row {
+        display: flex;
+        flex-direction: column;
+        gap: 1.2rem;
+        width: 100%;
+        margin: 0 auto 1.5rem auto;
+    }
+    .post-trace-col {
+        width: 100%;
+    }
+    @media (min-width: 900px) {
+        .post-trace-row {
+            flex-direction: row;
+            gap: 2.5rem;
+        }
+        .post-trace-col {
+            width: 50%;
+        }
+        .post-trace-left {
+            padding-right: 1.5rem;
+        }
+        .post-trace-right {
+            padding-left: 1.5rem;
+        }
+    }
 </style>
 """
 
@@ -516,7 +547,37 @@ with chat_column:
 with trace_column:
     render_trace_panel(trace_placeholder)
 
-render_post_trace_controls()
+# ****************************************
+# On desktop, post-trace controls are two columns: left for search, right for runtime details.
+# On mobile, they stack vertically.
+# ****************************************
+st.markdown(
+    """
+    <div class='post-trace-row'>
+      <div class='post-trace-col post-trace-left'>
+    """,
+    unsafe_allow_html=True,
+)
+# Left column: Quick Search and Search doctor availability
+st.markdown(
+    """
+    <div class="panel">
+        <h3>🔎 Quick search</h3>
+        <p>Open the popup to search live appointment availability from SQLite.</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+render_availability_lookup_button()
+st.markdown("</div><div class='post-trace-col post-trace-right'>", unsafe_allow_html=True)
+# Right column: Assistant runtime details
+with st.expander("⚙️ Assistant runtime details", expanded=True):
+    metric1, metric2, metric3, metric4 = st.columns(4)
+    metric1.metric("🤖 AI Status", "Ready")
+    metric2.metric("🧠 Model", "Gemini")
+    metric3.metric("📂 Data Source", "SQLite")
+    metric4.metric("⚡ UI Mode", "Modern")
+st.markdown("</div></div>", unsafe_allow_html=True)
 
 # This middle section helps first-time users understand what the assistant can do.
 info_left, info_middle, info_right = st.columns([1.15, 1.45, 1])
