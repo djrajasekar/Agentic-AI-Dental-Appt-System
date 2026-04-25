@@ -10,6 +10,7 @@ from datetime import date
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 from dental_agent.config.settings import BASE_DIR, GOOGLE_API_KEY, MODEL_NAME, VALID_SPECIALIZATIONS
 from main import process_user_message
@@ -247,6 +248,58 @@ def render_welcome_panel() -> None:
     )
 
 
+def render_post_trace_controls() -> None:
+    """Render search and runtime controls after trace so mobile order matches clinic workflow."""
+    st.markdown(
+        """
+        <div class="panel">
+            <h3>🔎 Quick search</h3>
+            <p>Open the popup to search live appointment availability from SQLite.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    render_availability_lookup_button()
+
+    with st.expander("⚙️ Assistant runtime details", expanded=True):
+        metric1, metric2, metric3, metric4 = st.columns(4)
+        metric1.metric("🤖 AI Status", "Ready")
+        metric2.metric("🧠 Model", "Gemini")
+        metric3.metric("📂 Data Source", "SQLite")
+        metric4.metric("⚡ UI Mode", "Modern")
+
+    # A single expander stays in sync with viewport: open on desktop, closed on mobile.
+    components.html(
+        """
+        <script>
+        const applyRuntimeDefault = () => {
+            const root = window.parent.document;
+            const detailsNodes = root.querySelectorAll('details');
+            let runtimeDetails = null;
+
+            detailsNodes.forEach((node) => {
+                const summary = node.querySelector('summary');
+                if (summary && summary.textContent && summary.textContent.includes('Assistant runtime details')) {
+                    runtimeDetails = node;
+                }
+            });
+
+            if (!runtimeDetails) {
+                return;
+            }
+
+            const isMobile = window.parent.matchMedia('(max-width: 768px)').matches;
+            runtimeDetails.open = !isMobile;
+        };
+
+        applyRuntimeDefault();
+        window.parent.addEventListener('resize', applyRuntimeDefault);
+        </script>
+        """,
+        height=0,
+    )
+
+
 def render_chat_area(trace_placeholder, placeholder: str, spinner_text: str = "Thinking with Gemini...") -> None:
     """Replay the visible transcript, then send each new prompt through the shared agent flow."""
     for msg in st.session_state.ui_messages:
@@ -433,42 +486,22 @@ render_sidebar("✨ Dental Care Command Center")
 # ****************************************
 # Main layout guides first-time staff through the app.
 # ****************************************
-header_left, header_right = st.columns([3.2, 1.2])
-with header_left:
-    st.markdown(
-        """
-        <div class="panel">
-            <h1>✨ Dental Care Command Center</h1>
-            <p>A premium clinic experience for appointments, schedules, and patient support.</p>
-            <div>
-                <span class="agent-chip">🤖 Supervisor Agent</span>
-                <span class="agent-chip">📅 Booking Agent</span>
-                <span class="agent-chip">❌ Cancellation Agent</span>
-                <span class="agent-chip">🔄 Reschedule Agent</span>
-                <span class="agent-chip">🦷 Dental Support</span>
-            </div>
+st.markdown(
+    """
+    <div class="panel">
+        <h1>✨ Dental Care Command Center</h1>
+        <p>A premium clinic experience for appointments, schedules, and patient support.</p>
+        <div>
+            <span class="agent-chip">🤖 Supervisor Agent</span>
+            <span class="agent-chip">📅 Booking Agent</span>
+            <span class="agent-chip">❌ Cancellation Agent</span>
+            <span class="agent-chip">🔄 Reschedule Agent</span>
+            <span class="agent-chip">🦷 Dental Support</span>
         </div>
-        """,
-        unsafe_allow_html=True,
-    )
-with header_right:
-    st.markdown(
-        """
-        <div class="panel">
-            <h3>🔎 Quick search</h3>
-            <p>Open the popup to search live appointment availability from SQLite.</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    render_availability_lookup_button()
-
-with st.expander("⚙️ Assistant runtime details", expanded=True):
-    metric1, metric2, metric3, metric4 = st.columns(4)
-    metric1.metric("🤖 AI Status", "Ready")
-    metric2.metric("🧠 Model", "Gemini")
-    metric3.metric("📂 Data Source", "SQLite")
-    metric4.metric("⚡ UI Mode", "Modern")
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ****************************************
 # Mobile-first order keeps chat before trace on narrow screens.
@@ -482,6 +515,8 @@ with chat_column:
 
 with trace_column:
     render_trace_panel(trace_placeholder)
+
+render_post_trace_controls()
 
 # This middle section helps first-time users understand what the assistant can do.
 info_left, info_middle, info_right = st.columns([1.15, 1.45, 1])
