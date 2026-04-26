@@ -577,35 +577,32 @@ with trace_column:
 
 # ****************************************
 # On desktop, post-trace controls are two columns: left for search, right for runtime details.
-# On mobile, they stack vertically.
+
 # ****************************************
-st.markdown(
-    """
-    <div class='post-trace-row'>
-      <div class='post-trace-col post-trace-left'>
-    """,
-    unsafe_allow_html=True,
-)
-# Left column: Quick Search and Search doctor availability
-st.markdown(
-    """
-    <div class="panel">
-        <h3>🔎 Quick search</h3>
-        <p>Open the popup to search live appointment availability from SQLite.</p>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-render_availability_lookup_button()
-st.markdown("</div><div class='post-trace-col post-trace-right'>", unsafe_allow_html=True)
-# Right column: Assistant runtime details
-with st.expander("⚙️ Assistant runtime details", expanded=True):
-    metric1, metric2, metric3, metric4 = st.columns(4)
-    metric1.metric("🤖 AI Status", "Ready")
-    metric2.metric("🧠 Model", "Gemini")
-    metric3.metric("📂 Data Source", "SQLite")
-    metric4.metric("⚡ UI Mode", "Modern")
-st.markdown("</div></div>", unsafe_allow_html=True)
+# Post-trace controls: left = quick search/search doctor availability, right = assistant runtime details
+
+# ****************************************
+# Use Streamlit columns for a true two-column row: left = quick search/search doctor, right = assistant runtime details
+# ****************************************
+left_col, right_col = st.columns([1, 1])
+with left_col:
+    st.markdown(
+        """
+        <div class="panel">
+            <h3>🔎 Quick search</h3>
+            <p>Open the popup to search live appointment availability from SQLite.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    render_availability_lookup_button()
+with right_col:
+    with st.expander("⚙️ Assistant runtime details", expanded=True):
+        metric1, metric2, metric3, metric4 = st.columns(4)
+        metric1.metric("🤖 AI Status", "Ready")
+        metric2.metric("🧠 Model", "Gemini")
+        metric3.metric("📂 Data Source", "SQLite")
+        metric4.metric("⚡ UI Mode", "Modern")
 
 # This middle section helps first-time users understand what the assistant can do.
 info_left, info_middle, info_right = st.columns([1.15, 1.45, 1])
