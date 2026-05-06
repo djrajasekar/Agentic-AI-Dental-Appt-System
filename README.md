@@ -59,22 +59,21 @@ The system follows a supervisor pattern where a central coordinator analyzes use
 - **Cancellation Agent**: Handles appointment cancellation requests.
 - **Rescheduling Agent**: Manages moving appointments to different time slots.
 
-
 ### Agent Tools Used
 
 - **Supervisor**: No direct SQLite read/write tools; this agent only routes requests.
 - **Info Agent**
-   - **SQLite read tools**: `get_available_slots`, `get_patient_appointments`, `check_slot_availability`, `list_doctors_by_specialization`
+  - **SQLite read tools**: `get_available_slots`, `get_patient_appointments`, `check_slot_availability`, `list_doctors_by_specialization`
 - **Booking Agent**
-   - **SQLite read tools**: `get_available_slots`, `check_slot_availability`
-   - **SQLite write tools**: `book_appointment`, `book_first_available_appointment`
-      - `book_first_available_appointment` enables flexible booking for requests like "book in the morning" or "if available, book it"—the agent will find and book the earliest matching slot for the requested window (morning, afternoon, evening) without requiring an exact time.
+  - **SQLite read tools**: `get_available_slots`, `check_slot_availability`
+  - **SQLite write tools**: `book_appointment`, `book_first_available_appointment`
+    - `book_first_available_appointment` enables flexible booking for requests like "book in the morning" or "if available, book it"—the agent will find and book the earliest matching slot for the requested window (morning, afternoon, evening) without requiring an exact time.
 - **Cancellation Agent**
-   - **SQLite read tool**: `get_patient_appointments`
-   - **SQLite write tool**: `cancel_appointment`
+  - **SQLite read tool**: `get_patient_appointments`
+  - **SQLite write tool**: `cancel_appointment`
 - **Rescheduling Agent**
-   - **SQLite read tools**: `get_patient_appointments`, `get_available_slots`
-   - **SQLite write tool**: `reschedule_appointment`
+  - **SQLite read tools**: `get_patient_appointments`, `get_available_slots`
+  - **SQLite write tool**: `reschedule_appointment`
 
 ### Technology Stack
 
@@ -305,7 +304,7 @@ python main.py
 Activate the virtual environment and launch the frontend:
 
 ```bash
-source .venv/bin/activate
+source .venv/Scripts/activate
 streamlit run modern_clinic_ui.py
 ```
 
