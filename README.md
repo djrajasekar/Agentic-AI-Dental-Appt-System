@@ -1,3 +1,5 @@
+
+
 # Dental Appointment Management System
 
 A conversational AI system for managing dental appointments, powered by LangGraph, LangChain and Google Gemini. This project demonstrates a multi-agent architecture where specialized agents work together to handle different appointment-related tasks through natural language interactions.
@@ -12,6 +14,10 @@ This system provides a chat-based interface for patients and clinic staff to:
 - **Reschedule appointments** to different time slots
 
 The system uses a supervisor agent that intelligently routes user requests to the appropriate specialized agent based on the detected intent, making it an excellent educational example of multi-agent AI systems.
+
+## 🚀 Live Demo
+
+[Try the app on Streamlit Cloud](https://agentic-ai-dental-appt-system.streamlit.app/)
 
 ## AI Agent Instructions (`AGENTS.md`)
 

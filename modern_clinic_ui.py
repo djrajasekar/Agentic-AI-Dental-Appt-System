@@ -10,6 +10,7 @@ from datetime import date
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 from dental_agent.config.settings import BASE_DIR, GOOGLE_API_KEY, MODEL_NAME, VALID_SPECIALIZATIONS
 from main import process_user_message
@@ -42,7 +43,7 @@ def init_ui_state() -> None:
     if "agent_history" not in st.session_state:
         st.session_state.agent_history = []
     if "ui_messages" not in st.session_state:
-        st.session_state.ui_messages = [{"role": "assistant", "content": WELCOME_MESSAGE}]
+        st.session_state.ui_messages = []
     if "pending_prompt" not in st.session_state:
         st.session_state.pending_prompt = None
     if "trace_events" not in st.session_state:
@@ -57,7 +58,7 @@ def queue_prompt(prompt_text: str) -> None:
 def clear_chat() -> None:
     """Reset only the visible conversation while leaving appointment data unchanged in SQLite."""
     st.session_state.agent_history = []
-    st.session_state.ui_messages = [{"role": "assistant", "content": WELCOME_MESSAGE}]
+    st.session_state.ui_messages = []
     st.session_state.pending_prompt = None
     st.session_state.trace_events = []
 
@@ -233,15 +234,89 @@ def render_trace_panel(trace_placeholder) -> None:
     trace_placeholder.markdown(_build_trace_markup(), unsafe_allow_html=True)
 
 
+def render_welcome_panel() -> None:
+    """Keep the onboarding welcome message in a stable spot below the command center."""
+    st.markdown(
+        """
+        <div class="panel">
+            <h3>👋 Welcome to the Dental Agentic AI Assistant</h3>
+            <p>I can help you <strong>check slots</strong>, <strong>book appointments</strong>, <strong>cancel bookings</strong>, and <strong>reschedule visits</strong>.</p>
+            <p>Ask a question below or use quick actions from the left panel.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_post_trace_controls() -> None:
+    """Render search and runtime controls after trace so mobile order matches clinic workflow."""
+    st.markdown(
+        """
+        <div class="panel">
+            <h3>🔎 Quick search</h3>
+            <p>Open the popup to search live appointment availability from SQLite.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    render_availability_lookup_button()
+
+    with st.expander("⚙️ Assistant runtime details", expanded=True):
+        metric1, metric2, metric3, metric4 = st.columns(4)
+        metric1.metric("🤖 AI Status", "Ready")
+        metric2.metric("🧠 Model", "Gemini")
+        metric3.metric("📂 Data Source", "SQLite")
+        metric4.metric("⚡ UI Mode", "Modern")
+
+    # A single expander stays in sync with viewport: open on desktop, closed on mobile.
+    components.html(
+        """
+        <script>
+        const applyRuntimeDefault = () => {
+            const root = window.parent.document;
+            const detailsNodes = root.querySelectorAll('details');
+            let runtimeDetails = null;
+
+            detailsNodes.forEach((node) => {
+                const summary = node.querySelector('summary');
+                if (summary && summary.textContent && summary.textContent.includes('Assistant runtime details')) {
+                    runtimeDetails = node;
+                }
+            });
+
+            if (!runtimeDetails) {
+                return;
+            }
+
+            const isMobile = window.parent.matchMedia('(max-width: 768px)').matches;
+            runtimeDetails.open = !isMobile;
+        };
+
+        applyRuntimeDefault();
+        window.parent.addEventListener('resize', applyRuntimeDefault);
+        </script>
+        """,
+        height=0,
+    )
+
+
 def render_chat_area(trace_placeholder, placeholder: str, spinner_text: str = "Thinking with Gemini...") -> None:
     """Replay the visible transcript, then send each new prompt through the shared agent flow."""
+    st.markdown('<div class="chat-area-panel">', unsafe_allow_html=True)
+    if not st.session_state.ui_messages:
+        st.markdown(
+            '''<div class="chat-cta">
+                <span>💬 Start the conversation</span>
+                <span class="chat-hint">&nbsp;|&nbsp;<b>Full Workflow trace</b> will appear after you start chatting.</span>
+            </div>''',
+            unsafe_allow_html=True,
+        )
     for msg in st.session_state.ui_messages:
         avatar = "🤖" if msg["role"] == "assistant" else "🙂"
         with st.chat_message(msg["role"], avatar=avatar):
-            if msg["role"] == "assistant":
-                st.markdown(msg["content"])
-            else:
-                st.markdown(msg["content"])
+            st.markdown(msg["content"])
+    # The chat hint is only shown in the empty state, not after each message
+    st.markdown('</div>', unsafe_allow_html=True)
 
     prompt = st.chat_input(placeholder)
     if not prompt and st.session_state.pending_prompt:
@@ -313,6 +388,14 @@ MODERN_CSS = """
         border: 1px solid rgba(148, 163, 184, 0.28);
         box-shadow: 0 12px 30px rgba(15, 23, 42, 0.10);
         backdrop-filter: blur(10px);
+        .chat-hint {
+            font-size: 1.05rem;
+            font-weight: 500;
+            color: #fffbe7;
+            opacity: 0.92;
+            margin-left: 0.5rem;
+            text-shadow: 0 1px 6px rgba(255, 152, 0, 0.18);
+        }
         margin-bottom: 1rem;
     }
     .trace-panel {
@@ -360,6 +443,18 @@ MODERN_CSS = """
     .panel h1, .panel h3, .panel p, .panel li {
         color: #10233a;
         margin-top: 0;
+    }
+    .panel h1 {
+        font-size: 2.1rem;
+        line-height: 1.15;
+        word-break: break-word;
+        white-space: normal;
+    }
+    @media (max-width: 600px) {
+        .panel h1 {
+            font-size: 1.35rem;
+            line-height: 1.18;
+        }
     }
     .agent-chip {
         display: inline-block;
@@ -410,6 +505,37 @@ MODERN_CSS = """
         background: rgba(255, 255, 255, 0.96);
         color: #10233a;
     }
+    .post-trace-controls {
+        width: 100%;
+        max-width: 100vw;
+        margin: 0 auto 1.5rem auto;
+        display: block;
+    }
+    .post-trace-row {
+        display: flex;
+        flex-direction: column;
+        gap: 1.2rem;
+        width: 100%;
+        margin: 0 auto 1.5rem auto;
+    }
+    .post-trace-col {
+        width: 100%;
+    }
+    @media (min-width: 900px) {
+        .post-trace-row {
+            flex-direction: row;
+            gap: 2.5rem;
+        }
+        .post-trace-col {
+            width: 50%;
+        }
+        .post-trace-left {
+            padding-right: 1.5rem;
+        }
+        .post-trace-right {
+            padding-left: 1.5rem;
+        }
+    }
 </style>
 """
 
@@ -419,25 +545,47 @@ render_sidebar("✨ Dental Care Command Center")
 # ****************************************
 # Main layout guides first-time staff through the app.
 # ****************************************
-header_left, header_right = st.columns([3.2, 1.2])
-with header_left:
-    st.markdown(
-        """
-        <div class="panel">
-            <h1>✨ Dental Care Command Center</h1>
-            <p>A premium clinic experience for appointments, schedules, and patient support.</p>
-            <div>
-                <span class="agent-chip">🤖 Supervisor Agent</span>
-                <span class="agent-chip">📅 Booking Agent</span>
-                <span class="agent-chip">❌ Cancellation Agent</span>
-                <span class="agent-chip">🔄 Reschedule Agent</span>
-                <span class="agent-chip">🦷 Dental Support</span>
-            </div>
+st.markdown(
+    """
+    <div class="panel">
+        <h1>✨ Dental Care Command Center</h1>
+        <p>A premium clinic experience for appointments, schedules, and patient support.</p>
+        <div>
+            <span class="agent-chip">🤖 Supervisor Agent</span>
+            <span class="agent-chip">📅 Booking Agent</span>
+            <span class="agent-chip">❌ Cancellation Agent</span>
+            <span class="agent-chip">🔄 Reschedule Agent</span>
+            <span class="agent-chip">🦷 Dental Support</span>
         </div>
-        """,
-        unsafe_allow_html=True,
-    )
-with header_right:
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ****************************************
+# Mobile-first order keeps chat before trace on narrow screens.
+# ****************************************
+render_welcome_panel()
+
+chat_column, trace_column = st.columns([1.45, 1], gap="large")
+trace_placeholder = trace_column.empty()
+with chat_column:
+    render_chat_area(trace_placeholder, "Ask the modern clinic assistant anything about appointments...")
+
+with trace_column:
+    render_trace_panel(trace_placeholder)
+
+# ****************************************
+# On desktop, post-trace controls are two columns: left for search, right for runtime details.
+
+# ****************************************
+# Post-trace controls: left = quick search/search doctor availability, right = assistant runtime details
+
+# ****************************************
+# Use Streamlit columns for a true two-column row: left = quick search/search doctor, right = assistant runtime details
+# ****************************************
+left_col, right_col = st.columns([1, 1])
+with left_col:
     st.markdown(
         """
         <div class="panel">
@@ -448,12 +596,13 @@ with header_right:
         unsafe_allow_html=True,
     )
     render_availability_lookup_button()
-
-metric1, metric2, metric3, metric4 = st.columns(4)
-metric1.metric("🤖 AI Status", "Ready")
-metric2.metric("🧠 Model", "Gemini")
-metric3.metric("📂 Data Source", "SQLite")
-metric4.metric("⚡ UI Mode", "Modern")
+with right_col:
+    with st.expander("⚙️ Assistant runtime details", expanded=True):
+        metric1, metric2, metric3, metric4 = st.columns(4)
+        metric1.metric("🤖 AI Status", "Ready")
+        metric2.metric("🧠 Model", "Gemini")
+        metric3.metric("📂 Data Source", "SQLite")
+        metric4.metric("⚡ UI Mode", "Modern")
 
 # This middle section helps first-time users understand what the assistant can do.
 info_left, info_middle, info_right = st.columns([1.15, 1.45, 1])
@@ -495,16 +644,8 @@ with info_right:
         """
         <div class="panel">
             <h3>📌 Live lookup</h3>
-            <p>Use the top-right search button anytime to filter slot availability by date, doctor, specialization, or booking status.</p>
+            <p>Use the <b>Quick Search</b> and <b>Search doctor availability</b> options to filter slot availability by date, doctor, specialization, or booking status.</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
-
-chat_column, trace_column = st.columns([1.45, 1], gap="large")
-with trace_column:
-    trace_placeholder = st.empty()
-    render_trace_panel(trace_placeholder)
-
-with chat_column:
-    render_chat_area(trace_placeholder, "Ask the modern clinic assistant anything about appointments...")
